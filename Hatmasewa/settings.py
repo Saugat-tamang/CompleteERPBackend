@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'central',
+    'tenant',
 ]
 
 MIDDLEWARE = [
@@ -44,6 +46,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'tenant.middleware.TenantDatabaseMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -79,8 +82,18 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default=3306, cast=int),
+    },
+    'central': {
+        'ENGINE': config('CENTRAL_DB_ENGINE', default='django.db.backends.mysql'),
+        'NAME': config('CENTRAL_DB_NAME', default=config('DB_NAME')),
+        'USER': config('CENTRAL_DB_USER', default=config('DB_USER')),
+        'PASSWORD': config('CENTRAL_DB_PASSWORD', default=config('DB_PASSWORD', default='')),
+        'HOST': config('CENTRAL_DB_HOST', default=config('DB_HOST', default='localhost')),
+        'PORT': config('CENTRAL_DB_PORT', default=config('DB_PORT', default=3306), cast=int),
     }
 }
+
+DATABASE_ROUTERS = ['Hatmasewa.db_router.CentralTenantDatabaseRouter']
 
 
 # Default primary key field type
