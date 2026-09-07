@@ -1,21 +1,3 @@
-"""
-TENANT DATABASE MODELS
-=======================
-This EXACT models file is migrated into a fresh, isolated database
-for every company that signs up (true database-per-tenant).
-
-The connection string for a given company's DB comes from
-CompanyDatabase.connection_url in the central app.
-
-Everything here is scoped to ONE company — there's no `company`
-foreign key anywhere because the whole database IS that one
-company's data.
-
-Intended to sit in its own Django app, e.g. `apps/tenant/models.py`,
-routed per-request to the correct tenant DB via a DB router /
-django-tenants / django-multitenant style setup.
-"""
-
 import uuid
 from django.db import models
 
@@ -27,7 +9,6 @@ class TimeStampedModel(models.Model):
     class Meta:
         abstract = True
 
-
 # ------------------------------------------------------------
 # COMPANY PROFILE (the deep business detail that only matters
 # once you're "inside" the tenant)
@@ -35,10 +16,15 @@ class TimeStampedModel(models.Model):
 
 class CompanyProfile(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    org_id = models.PositiveBigIntegerField(
+        unique=True,
+        editable=False,
+        help_text="Public organization ID copied from the central company record.",
+    )
     legal_name = models.CharField(max_length=255)
     display_name = models.CharField(max_length=255)
     registration_no = models.CharField(max_length=100, blank=True, null=True)
-    tax_id = models.CharField(max_length=100, blank=True, null=True)  # GSTIN/VAT/EIN
+    tax_id = models.CharField(max_length=100, blank=True, null=True)
     industry = models.CharField(max_length=100, blank=True, null=True)
     company_size = models.CharField(max_length=50, blank=True, null=True)
     website = models.URLField(blank=True, null=True)
@@ -56,12 +42,13 @@ class CompanyProfile(TimeStampedModel):
     # localization
     timezone = models.CharField(max_length=64, default="UTC")
     locale = models.CharField(max_length=16, default="en")
-    currency = models.CharField(max_length=8, default="USD")
+    currency = models.CharField(max_length=8, default="NRP")
     date_format = models.CharField(max_length=20, default="DD/MM/YYYY")
-    fiscal_year_start = models.CharField(max_length=5, default="01-01")  # MM-DD
+    fiscal_year_start = models.CharField(max_length=5, default="04-01")
 
     class Meta:
         db_table = "company_profile"
+        indexes = [models.Index(fields=["org_id"])]
 
     def __str__(self):
         return self.display_name
@@ -73,10 +60,8 @@ class CompanyProfile(TimeStampedModel):
 
 class Branch(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company_profile = models.ForeignKey(
-        CompanyProfile, on_delete=models.CASCADE, related_name="branches"
-    )
-    name = models.CharField(max_length=255)  # "Head Office", "Mumbai Branch"
+    company_profile = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, related_name="branches")
+    name = models.CharField(max_length=255)
     code = models.CharField(max_length=50, unique=True, blank=True, null=True)
     address_line1 = models.CharField(max_length=255, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
@@ -95,23 +80,12 @@ class Branch(models.Model):
 
 class Department(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company_profile = models.ForeignKey(
-        CompanyProfile, on_delete=models.CASCADE, related_name="departments"
-    )
-    branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, related_name="departments",
-        blank=True, null=True,
-    )
-    name = models.CharField(max_length=255)  # "Engineering", "Sales"
+    company_profile = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, related_name="departments")
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, related_name="departments",blank=True, null=True,)
+    name = models.CharField(max_length=255)
     code = models.CharField(max_length=50, blank=True, null=True)
-    parent = models.ForeignKey(
-        "self", on_delete=models.SET_NULL, related_name="children",
-        blank=True, null=True,
-    )
-    head_user_id = models.UUIDField(
-        blank=True, null=True,
-        help_text="References a User in the app-level user table",
-    )
+    parent = models.ForeignKey("self", on_delete=models.SET_NULL, related_name="children",blank=True, null=True,)
+    head_user_id = models.UUIDField(blank=True, null=True,help_text="References a User in the app-level user table",)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -129,9 +103,7 @@ class Department(models.Model):
 
 class CompanySetting(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company_profile = models.ForeignKey(
-        CompanyProfile, on_delete=models.CASCADE, related_name="settings"
-    )
+    company_profile = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, related_name="settings")
     category = models.CharField(max_length=100)  # "notifications", "security"...
     key = models.CharField(max_length=100)  # "invoice_prefix", "2fa_required"
     value = models.JSONField()
@@ -151,9 +123,7 @@ class CompanySetting(models.Model):
 
 class CompanyDocument(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company_profile = models.ForeignKey(
-        CompanyProfile, on_delete=models.CASCADE, related_name="documents"
-    )
+    company_profile = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, related_name="documents")
     type = models.CharField(max_length=50)  # "letterhead", "terms", "nda_template"
     name = models.CharField(max_length=255)
     file_url = models.URLField()

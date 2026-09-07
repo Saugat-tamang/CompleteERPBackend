@@ -1,22 +1,14 @@
-"""
-CENTRAL / MASTER DATABASE MODELS
-================================
-One shared database for the whole platform. Every company (tenant)
-signs up here first. This DB knows WHO the tenants are and WHERE
-their dedicated database lives — it does NOT hold their business
-data (that lives in the per-tenant DB, see tenant/models.py).
-
-Intended to sit in its own Django app, e.g. `apps/central/models.py`,
-routed to a "central" database via a DB router.
-"""
-
 import uuid
+import secrets
 from django.db import models
 
 
 # ------------------------------------------------------------
 # CHOICES
 # ------------------------------------------------------------
+
+def generate_org_id():
+    return secrets.randbelow(9_000_000_000) + 1_000_000_000
 
 class CompanySize(models.TextChoices):
     SELF_EMPLOYED = "SELF_EMPLOYED", "1 (Self-employed)"
@@ -103,27 +95,25 @@ class CompanyOwner(TimeStampedModel):
 
 class Company(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    org_id = models.PositiveBigIntegerField(
+        default=generate_org_id,
+        unique=True,
+        editable=False,
+        help_text="Public organization ID shared with the tenant database.",
+    )
     name = models.CharField(max_length=255)
-    slug = models.SlugField(unique=True, help_text='e.g. "acme" -> acme.yourapp.com')
+    slug = models.SlugField(unique=True)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=32, blank=True, null=True)
     industry = models.CharField(max_length=100, blank=True, null=True)
-    company_size = models.CharField(
-        max_length=20, choices=CompanySize.choices, blank=True, null=True
-    )
+    company_size = models.CharField(max_length=20, choices=CompanySize.choices, blank=True, null=True)
     country = models.CharField(max_length=100, blank=True, null=True)
     timezone = models.CharField(max_length=64, default="UTC")
     locale = models.CharField(max_length=16, default="en")
     currency = models.CharField(max_length=8, default="USD")
-    status = models.CharField(
-        max_length=20, choices=CompanyStatus.choices, default=CompanyStatus.TRIAL
-    )
+    status = models.CharField(max_length=20, choices=CompanyStatus.choices, default=CompanyStatus.TRIAL)
     logo_url = models.URLField(blank=True, null=True)
-
-    owner = models.OneToOneField(
-        CompanyOwner, on_delete=models.PROTECT, related_name="company"
-    )
-
+    owner = models.OneToOneField(CompanyOwner, on_delete=models.PROTECT, related_name="company")
     trial_ends_at = models.DateTimeField(blank=True, null=True)
     suspended_at = models.DateTimeField(blank=True, null=True)
     deleted_at = models.DateTimeField(blank=True, null=True)  # soft delete
@@ -131,6 +121,7 @@ class Company(TimeStampedModel):
     class Meta:
         db_table = "companies"
         indexes = [
+            models.Index(fields=["org_id"]),
             models.Index(fields=["status"]),
             models.Index(fields=["slug"]),
         ]
@@ -146,10 +137,7 @@ class Company(TimeStampedModel):
 
 class CompanyDatabase(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company = models.OneToOneField(
-        Company, on_delete=models.CASCADE, related_name="database"
-    )
-
+    company = models.OneToOneField(Company, on_delete=models.CASCADE, related_name="database")
     provider = models.CharField(max_length=32, default="postgresql")
     host = models.CharField(max_length=255)
     port = models.PositiveIntegerField(default=5432)
@@ -157,10 +145,7 @@ class CompanyDatabase(TimeStampedModel):
     connection_url = models.TextField(help_text="Encrypt at rest in production")
     region = models.CharField(max_length=64, blank=True, null=True)
     schema_version = models.CharField(max_length=32, default="1.0.0")
-
-    status = models.CharField(
-        max_length=20, choices=DbStatus.choices, default=DbStatus.PROVISIONING
-    )
+    status = models.CharField(max_length=20, choices=DbStatus.choices, default=DbStatus.PROVISIONING)
     provisioned_at = models.DateTimeField(blank=True, null=True)
     last_migrated_at = models.DateTimeField(blank=True, null=True)
 
@@ -177,13 +162,9 @@ class CompanyDatabase(TimeStampedModel):
 
 class CompanyDomain(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name="domains"
-    )
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="domains")
     domain = models.CharField(max_length=255, unique=True)
-    type = models.CharField(
-        max_length=20, choices=DomainType.choices, default=DomainType.SUBDOMAIN
-    )
+    type = models.CharField(max_length=20, choices=DomainType.choices, default=DomainType.SUBDOMAIN)
     is_verified = models.BooleanField(default=False)
     is_primary = models.BooleanField(default=True)
 
@@ -217,25 +198,14 @@ class Plan(models.Model):
 
 class CompanySubscription(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company = models.OneToOneField(
-        Company, on_delete=models.CASCADE, related_name="subscription"
-    )
-    plan = models.ForeignKey(
-        Plan, on_delete=models.PROTECT, related_name="subscriptions"
-    )
-
-    billing_cycle = models.CharField(
-        max_length=10, choices=BillingCycle.choices, default=BillingCycle.MONTHLY
-    )
+    company = models.OneToOneField(Company, on_delete=models.CASCADE, related_name="subscription")
+    plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="subscriptions")
+    billing_cycle = models.CharField(max_length=10, choices=BillingCycle.choices, default=BillingCycle.MONTHLY)
     seats = models.PositiveIntegerField(default=1)
     start_date = models.DateTimeField(auto_now_add=True)
     current_period_end = models.DateTimeField()
     cancel_at_period_end = models.BooleanField(default=False)
-    status = models.CharField(
-        max_length=20,
-        choices=SubscriptionStatus.choices,
-        default=SubscriptionStatus.TRIALING,
-    )
+    status = models.CharField(max_length=20,choices=SubscriptionStatus.choices,default=SubscriptionStatus.TRIALING,)
 
     class Meta:
         db_table = "company_subscriptions"
@@ -246,14 +216,10 @@ class CompanySubscription(TimeStampedModel):
 
 class CompanyInvoice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name="invoices"
-    )
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="invoices")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=8, default="USD")
-    status = models.CharField(
-        max_length=20, choices=InvoiceStatus.choices, default=InvoiceStatus.PENDING
-    )
+    status = models.CharField(max_length=20, choices=InvoiceStatus.choices, default=InvoiceStatus.PENDING)
     issued_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(blank=True, null=True)
     invoice_url = models.URLField(blank=True, null=True)
@@ -271,7 +237,7 @@ class CompanyInvoice(models.Model):
 
 class Module(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    code = models.SlugField(max_length=50, unique=True)  # "crm", "books", "desk"
+    code = models.SlugField(max_length=50, unique=True)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
 
@@ -284,12 +250,8 @@ class Module(models.Model):
 
 class CompanyModule(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name="modules"
-    )
-    module = models.ForeignKey(
-        Module, on_delete=models.CASCADE, related_name="companies"
-    )
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="modules")
+    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name="companies")
     enabled_at = models.DateTimeField(auto_now_add=True)
     is_enabled = models.BooleanField(default=True)
 
@@ -307,12 +269,8 @@ class CompanyModule(models.Model):
 
 class CompanyAuditLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name="audit_logs"
-    )
-    action = models.CharField(
-        max_length=100, help_text='e.g. "company.suspended", "plan.upgraded"'
-    )
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="audit_logs")
+    action = models.CharField(max_length=100, help_text='e.g. "company.suspended", "plan.upgraded"')
     performed_by = models.CharField(max_length=255, blank=True, null=True)
     metadata = models.JSONField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
