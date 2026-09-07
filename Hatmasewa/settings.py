@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'central',
     'tenant',
+    'rest_framework',
+    'accounts_auth',
 ]
 
 MIDDLEWARE = [
@@ -94,6 +96,12 @@ DATABASES = {
 }
 
 DATABASE_ROUTERS = ['Hatmasewa.db_router.CentralTenantDatabaseRouter']
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'accounts_auth.authentication.CompanyOwnerJWTAuthentication',
+    ),
+}
 
 
 # Default primary key field type
