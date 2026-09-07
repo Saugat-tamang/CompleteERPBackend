@@ -146,7 +146,7 @@ class Company(TimeStampedModel):
 class CompanyDatabase(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company = models.OneToOneField(Company, on_delete=models.CASCADE, related_name="database")
-    provider = models.CharField(max_length=32, default="postgresql")
+    provider = models.CharField(max_length=32, default="mysql")
     host = models.CharField(max_length=255)
     port = models.PositiveIntegerField(default=5432)
     database_name = models.CharField(max_length=128, help_text='e.g. "tenant_acme"')
