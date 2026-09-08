@@ -75,12 +75,8 @@ class UserProfile(BaseModel):
     """1:1 extension of User for non-auth-critical fields."""
     user = models.OneToOneField(User, related_name="profile", on_delete=models.CASCADE)
     avatar_url = models.URLField(blank=True)
-    timezone = models.ForeignKey(
-        "system_core.TimeZone", null=True, blank=True, on_delete=models.SET_NULL
-    )
-    language = models.ForeignKey(
-        "system_core.Language", null=True, blank=True, on_delete=models.SET_NULL
-    )
+    timezone = models.ForeignKey("system_core.TimeZone", null=True, blank=True, on_delete=models.SET_NULL)
+    language = models.ForeignKey("system_core.Language", null=True, blank=True, on_delete=models.SET_NULL)
     date_format = models.CharField(max_length=20, default="YYYY-MM-DD")
 
     class Meta:
@@ -101,12 +97,8 @@ class RefreshToken(BaseModel):
     the longer-lived refresh token half of the JWT pair).
     """
     user = models.ForeignKey(User, related_name="refresh_tokens", on_delete=models.CASCADE)
-    token = models.CharField(max_length=512, unique=True, db_index=True)
-    company = models.ForeignKey(
-        "tenants.Company", null=True, blank=True,
-        related_name="+", on_delete=models.SET_NULL,
-        help_text="Which company context this session was issued for, if any.",
-    )
+    token = models.CharField(max_length=255, unique=True, db_index=True)
+    company = models.ForeignKey("tenants.Company", null=True, blank=True,related_name="+", on_delete=models.SET_NULL,help_text="Which company context this session was issued for, if any.",)
     device_info = models.CharField(max_length=255, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     expires_at = models.DateTimeField()
@@ -149,9 +141,7 @@ class LoginHistory(BaseModel):
     failure_reason = models.CharField(max_length=100, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=255, blank=True)
-    company = models.ForeignKey(
-        "tenants.Company", null=True, blank=True, related_name="+", on_delete=models.SET_NULL
-    )
+    company = models.ForeignKey("tenants.Company", null=True, blank=True, related_name="+", on_delete=models.SET_NULL)
 
     class Meta:
         db_table = "accounts_login_history"

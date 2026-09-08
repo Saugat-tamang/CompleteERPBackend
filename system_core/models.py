@@ -6,6 +6,7 @@ Shared infrastructure models. Nothing in this file should import from
 references like "tenants.Company" instead) to avoid circular imports —
 accounts and tenants both depend on system_core, not the other way around.
 """
+
 import contextvars
 import uuid
 from contextlib import contextmanager
