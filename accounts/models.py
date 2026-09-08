@@ -1,19 +1,15 @@
 """
-accounts/models.py
-
 Identity & access — shared across all tenants (lives in the shared DB,
 never in a per-tenant database). A single User can belong to many
 Companies via UserCompany, exactly like Zoho's account-switcher.
 """
 import uuid
-
-from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
-from django.contrib.auth.models import PermissionsMixin
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-
+from django.contrib.auth.models import PermissionsMixin
 from system_core.models import BaseModel, TrackedModel, FullBaseModel
+from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 
 
 # ===========================================================================
@@ -50,8 +46,8 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     last_name = models.CharField(max_length=100, blank=True)
 
     is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False)   # Django admin access
-    is_verified = models.BooleanField(default=False)  # email verified
+    is_staff = models.BooleanField(default=False)   
+    is_verified = models.BooleanField(default=False)  
 
     last_login_at = models.DateTimeField(null=True, blank=True)
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
